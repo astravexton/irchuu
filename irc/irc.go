@@ -2,13 +2,8 @@
 package irchuu
 
 import (
-	"code.cloudfoundry.org/bytefmt"
 	"database/sql"
 	"fmt"
-	"github.com/26000/irchuu/config"
-	"github.com/26000/irchuu/db"
-	"github.com/26000/irchuu/relay"
-	"github.com/thoj/go-ircevent"
 	"log"
 	"os"
 	"strconv"
@@ -16,6 +11,12 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"code.cloudfoundry.org/bytefmt"
+	"github.com/26000/irchuu/config"
+	"github.com/26000/irchuu/db"
+	"github.com/26000/irchuu/relay"
+	"github.com/thoj/go-ircevent"
 )
 
 // Launch starts the IRC bot and waits for messages.
@@ -261,7 +262,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 			if strings.HasPrefix(event.Message(), c.Nick) {
 				processCmd(event, irchuu, c, r, db, &names)
 			}
-		} else {
+		} /*else {
 			logger.Printf("Message from %v: %v\n",
 				event.Nick, event.Message())
 			if names[event.Nick] != 0 {
@@ -272,7 +273,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 						" https://github.com/26000/irchuu"+
 						" for more info.")
 			}
-		}
+		}*/
 	})
 
 	irchuu.AddCallback("CTCP_ACTION", func(event *irc.Event) {
@@ -563,9 +564,9 @@ func formatIRCMessages(message relay.Message, c *config.Irc, prefixLen int) []st
 	var nick string
 
 	if !message.Source {
-		nick = c.Prefix + colorizeNick(message.Nick, c) + c.Postfix
+		nick = colorizeNick(message.Nick, c)
 	} else {
-		nick = c.Prefix + formatNick(message, c) + c.Postfix
+		nick = formatNick(message, c)
 	}
 	// 512 - 2 for CRLF - 7 for "PRIVMSG" - 4 for spaces - 9 just in case - 50 just in case
 	acceptibleLength := 440 - len(nick) - len(c.Channel) - prefixLen
@@ -574,16 +575,17 @@ func formatIRCMessages(message relay.Message, c *config.Irc, prefixLen int) []st
 		message.Text = strings.Replace(message.Text, "\n", c.Ellipsis, -1)
 	}
 
-	if message.Extra["forward"] != "" {
-		message.Text = fmt.Sprintf("[\x0310fwd\x0f from @%v] %v",
-			colorizeNick(message.Extra["forward"], c), message.Text)
-	} else if message.Extra["forwardChat"] != "" {
-		message.Text = fmt.Sprintf("[\x0310fwd\x0f from channel @%v] %v",
-			colorizeNick(message.Extra["forwardChat"], c), message.Text)
-	} else if message.Extra["forwardChatTitle"] != "" {
-		message.Text = fmt.Sprintf("[\x0310fwd\x0f from channel %v] %v",
-			colorizeNick(message.Extra["forwardChatTitle"], c), message.Text)
-	} else if message.Extra["reply"] != "" && message.Extra["replyUserID"] != "" {
+	// if message.Extra["forward"] != "" {
+	// 	message.Text = fmt.Sprintf("[\x0310fwd\x0f from @%v] %v",
+	// 		colorizeNick(message.Extra["forward"], c), message.Text)
+	// } else if message.Extra["forwardChat"] != "" {
+	// 	message.Text = fmt.Sprintf("[\x0310fwd\x0f from channel @%v] %v",
+	// 		colorizeNick(message.Extra["forwardChat"], c), message.Text)
+	// } else if message.Extra["forwardChatTitle"] != "" {
+	// 	message.Text = fmt.Sprintf("[\x0310fwd\x0f from channel %v] %v",
+	// 		colorizeNick(message.Extra["forwardChatTitle"], c), message.Text)
+	/*} else*/
+	if message.Extra["reply"] != "" && message.Extra["replyUserID"] != "" {
 		message.Text = fmt.Sprintf("@%v, %v",
 			colorizeNick(message.Extra["reply"], c), message.Text)
 	} else if message.Extra["reply"] != "" {
@@ -599,7 +601,7 @@ func formatIRCMessages(message relay.Message, c *config.Irc, prefixLen int) []st
 		message.Text = formatMediaMessage(message, c)
 	}
 
-	messages := splitLines(message.Text, acceptibleLength, nick+" ")
+	messages := splitLines(message.Text, acceptibleLength, "")
 	return messages
 }
 
@@ -613,7 +615,7 @@ func formatMediaMessage(message relay.Message, c *config.Irc) string {
 		text += " "
 	}
 	if message.Extra["url"] != "" {
-		text += "( " + message.Extra["url"] + " ) "
+		text += message.Extra["url"] + " "
 	}
 	intSize, _ := strconv.ParseUint(message.Extra["size"], 10, 64)
 	size := bytefmt.ByteSize(intSize)
@@ -621,25 +623,23 @@ func formatMediaMessage(message relay.Message, c *config.Irc) string {
 	case "sticker":
 		fallthrough
 	case "photo":
-		text += fmt.Sprintf("(%v, %v×%v, %viB)",
-			message.Extra["media"], message.Extra["width"],
+		text += fmt.Sprintf("(%v×%v, %viB)",
+			message.Extra["width"],
 			message.Extra["height"], size)
 	case "document":
-		text += fmt.Sprintf("(\"%v\", %viB)", message.Extra["mediaName"],
-			size)
+		text += fmt.Sprintf("(%viB)", size)
 	case "audio":
-		text += fmt.Sprintf("%v — %v (%vs, %viB)",
+		text += fmt.Sprintf("(%v — %v) (%viB)",
 			message.Extra["performer"], message.Extra["mediaName"],
-			message.Extra["duration"], size)
+			size)
 	case "video":
-		text += fmt.Sprintf("(%v, %v×%v×%vs, %viB)",
-			message.Extra["media"], message.Extra["width"],
+		text += fmt.Sprintf("(%v×%v×%vs, %viB)",
+			message.Extra["width"],
 			message.Extra["height"], message.Extra["duration"],
 			size)
 	case "voice":
-		text += fmt.Sprintf("(%v, %vs, %viB)",
-			message.Extra["media"], message.Extra["duration"],
-			size)
+		text += fmt.Sprintf("(%vs, %viB)",
+			message.Extra["duration"], size)
 	}
 	return text
 }

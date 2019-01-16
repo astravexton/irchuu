@@ -1,4 +1,4 @@
-module github.com/26000/irchuu
+module github.com/nathan0/irchuu
 
 require (
 	code.cloudfoundry.org/bytefmt v0.0.0-20180906201452-2aa6f33b730c

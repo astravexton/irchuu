@@ -46,7 +46,7 @@ func ReadConfig(path string) (error, *Irc, *Telegram, *Irchuu) {
 
 // PopulateConfig copies the sample config to <path>.
 func PopulateConfig(file string) error {
-	config := `# IRChuu configuration file. See https://github.com/26000/irchuu for help.
+	config := `# IRChuu configuration file. See https://github.com/nathan0/irchuu for help.
 [irchuu]
 
 # URI of your PostgreSQL database

@@ -4,11 +4,11 @@ package telegram
 import (
 	"database/sql"
 	"fmt"
-	"github.com/26000/irchuu/config"
-	"github.com/26000/irchuu/db"
-	"github.com/26000/irchuu/paths"
-	"github.com/26000/irchuu/relay"
-	"github.com/26000/irchuu/upload"
+	"github.com/nathan0/irchuu/config"
+	"github.com/nathan0/irchuu/db"
+	"github.com/nathan0/irchuu/paths"
+	"github.com/nathan0/irchuu/relay"
+	"github.com/nathan0/irchuu/upload"
 	"gopkg.in/telegram-bot-api.v4"
 	"html"
 	"io"
@@ -312,7 +312,7 @@ func processPM(bot *tgbotapi.BotAPI, c *config.Telegram, message *tgbotapi.Messa
 		message.Text)
 	msg := tgbotapi.NewMessage(message.Chat.ID,
 		"I only work in my group.\nIf you want to know more about me, "+
-			"visit my [GitHub](https://github.com/26000/irchuu).")
+			"visit my [GitHub](https://github.com/nathan0/irchuu).")
 	msg.ParseMode = "Markdown"
 	bot.Send(msg)
 }

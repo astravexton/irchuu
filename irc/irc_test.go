@@ -1,8 +1,8 @@
 package irchuu
 
 import (
-	"github.com/26000/irchuu/config"
-	"github.com/26000/irchuu/relay"
+	"github.com/nathan0/irchuu/config"
+	"github.com/nathan0/irchuu/relay"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -83,7 +83,7 @@ var (
 
 	colorizeNickTestData = map[string][2]string{
 		"irchuu":    [2]string{"\x036irchuu\x03", "\x033irchuu\x03"},
-		"26000":     [2]string{"\x03326000\x03", "\x031526000\x03"},
+		"nathan0":     [2]string{"\x033nathan0\x03", "\x0315nathan0\x03"},
 		"nick":      [2]string{"\x032nick\x03", "\x037nick\x03"},
 		"irc":       [2]string{"\x037irc\x03", "\x036irc\x03"},
 		"github":    [2]string{"\x032github\x03", "\x032github\x03"},
@@ -99,7 +99,7 @@ var (
 	// data using the function itself... https://play.golang.org/p/g08Au2v2Vg
 	djb2TestData = map[string]int32{
 		"irchuu":    85175221,
-		"26000":     195442781,
+		"nathan0":     195442781,
 		"nick":      2090544394,
 		"irc":       193495203,
 		"github":    -3157944,

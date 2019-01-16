@@ -1,5 +1,5 @@
-# [IRChuu](https://26000.github.io/irchuu/) [![](https://goreportcard.com/badge/github.com/26000/irchuu)](https://goreportcard.com/report/github.com/26000/irchuu)
-![IRChuu in WeeChat](https://26000.github.io/irchuu/images/shadow/Screenshot_20170319_092103.png)
+# [IRChuu](https://nathan0.github.io/irchuu/) [![](https://goreportcard.com/badge/github.com/nathan0/irchuu)](https://goreportcard.com/report/github.com/nathan0/irchuu)
+![IRChuu in WeeChat](https://nathan0.github.io/irchuu/images/shadow/Screenshot_20170319_092103.png)
 
 A Telegram<->IRC transport.
 
@@ -24,25 +24,25 @@ You need to install [golang](https://golang.org/doc/install), [git](https://git-
 
 After that, install IRChuu~:
 ```
-$ go get github.com/26000/irchuu/cmd/irchuu
+$ go get github.com/nathan0/irchuu/cmd/irchuu
 ```
 Upgrade with:
 ```
-$ go get -u github.com/26000/irchuu/cmd/irchuu
+$ go get -u github.com/nathan0/irchuu/cmd/irchuu
 ```
 
 #### go modules mode, go >= 1.11
 Install and/or upgrade:
 ```
-$ go get github.com/26000/irchuu/cmd/irchuu
+$ go get github.com/nathan0/irchuu/cmd/irchuu
 ```
 
 ### Configuration
 Run IRChuu~ for the first time and it will create a configuration file (you can also use `-data` and `-config` command-line arguments to specify a custom path):
 ```
 $ irchuu
-IRChuu! v0.6.0 (https://github.com/26000/irchuu)
-2017/04/01 15:26:03 New configuration file was populated. Edit /home/26000/.config/irchuu.conf and run `irchuu` again!
+IRChuu! v0.6.0 (https://github.com/nathan0/irchuu)
+2017/04/01 15:26:03 New configuration file was populated. Edit /home/nathan0/.config/irchuu.conf and run `irchuu` again!
 ```
 
 Now edit the configuration file with your favourite editor (mine is `vim`, but I thought `nano` is more popular. Alternatively, you can just use a GUI editor like Kate):

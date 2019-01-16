@@ -3,7 +3,7 @@ package irchuubase
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/26000/irchuu/relay"
+	"github.com/nathan0/irchuu/relay"
 	_ "github.com/lib/pq"
 	"log"
 	"os"

@@ -10,18 +10,18 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/26000/irchuu/config"
-	"github.com/26000/irchuu/db"
-	"github.com/26000/irchuu/hq"
-	"github.com/26000/irchuu/irc"
-	"github.com/26000/irchuu/paths"
-	"github.com/26000/irchuu/relay"
-	"github.com/26000/irchuu/server"
-	"github.com/26000/irchuu/telegram"
+	"github.com/nathan0/irchuu/config"
+	"github.com/nathan0/irchuu/db"
+	"github.com/nathan0/irchuu/hq"
+	"github.com/nathan0/irchuu/irc"
+	"github.com/nathan0/irchuu/paths"
+	"github.com/nathan0/irchuu/relay"
+	"github.com/nathan0/irchuu/server"
+	"github.com/nathan0/irchuu/telegram"
 )
 
 func main() {
-	fmt.Printf("IRChuu! v%v (https://github.com/26000/irchuu)\n", config.VERSION)
+	fmt.Printf("IRChuu! v%v (https://github.com/nathan0/irchuu)\n", config.VERSION)
 
 	configFile, dataDir := paths.GetPaths()
 

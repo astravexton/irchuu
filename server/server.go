@@ -1,7 +1,7 @@
 package mediaserver
 
 import (
-	"github.com/26000/irchuu/config"
+	"github.com/nathan0/irchuu/config"
 	"log"
 	"net/http"
 	"os"

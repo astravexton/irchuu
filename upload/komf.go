@@ -2,8 +2,8 @@ package upload
 
 import (
 	"bytes"
-	"github.com/26000/irchuu/config"
-	"github.com/26000/irchuu/paths"
+	"github.com/nathan0/irchuu/config"
+	"github.com/nathan0/irchuu/paths"
 	"gopkg.in/telegram-bot-api.v4"
 	"io"
 	"io/ioutil"

@@ -11,11 +11,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/26000/irchuu/config"
+	"github.com/nathan0/irchuu/config"
 )
 
 // URI of the HQ endpoint.
-const URI = "https://26000.github.io/irchuu/version.json"
+const URI = "https://nathan0.github.io/irchuu/version.json"
 
 // Report checks for a new version sending data if enabled.
 func Report(irchuu *config.Irchuu, tg *config.Telegram, irc *config.Irc) {
@@ -46,7 +46,7 @@ func Report(irchuu *config.Irchuu, tg *config.Telegram, irc *config.Irc) {
 			return
 		}
 		if layer > config.LAYER {
-			log.Println("New version available, please check https://github.com/26000/irchuu\n  or use `go get -u github.com/26000/irchuu` if using go < 1.11, `go get github.com/26000/irchuu` otherwise")
+			log.Println("New version available, please check https://github.com/nathan0/irchuu\n  or use `go get -u github.com/nathan0/irchuu` if using go < 1.11, `go get github.com/nathan0/irchuu` otherwise")
 		} else {
 			log.Println("Using the latest version of IRChuu.")
 		}

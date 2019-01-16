@@ -13,9 +13,9 @@ import (
 	"unicode/utf8"
 
 	"code.cloudfoundry.org/bytefmt"
-	"github.com/26000/irchuu/config"
-	"github.com/26000/irchuu/db"
-	"github.com/26000/irchuu/relay"
+	"github.com/nathan0/irchuu/config"
+	"github.com/nathan0/irchuu/db"
+	"github.com/nathan0/irchuu/relay"
 	"github.com/thoj/go-ircevent"
 )
 
@@ -50,7 +50,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 	irchuu.Debug = c.Debug
 	irchuu.Log = logger
 	irchuu.QuitMessage = "IRChuu!bye"
-	irchuu.Version = fmt.Sprintf("IRChuu! v%v (https://github.com/26000/irchuu), based on %v", config.VERSION, irc.VERSION)
+	irchuu.Version = fmt.Sprintf("IRChuu! v%v (https://github.com/nathan0/irchuu), based on %v", config.VERSION, irc.VERSION)
 
 	/* START CALLBACKS */
 	irchuu.AddCallback("CTCP_VERSION", func(event *irc.Event) {
@@ -270,7 +270,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 			} else {
 				noticeOrMsg(irchuu, c.SendNotices, event.Nick,
 					"I work only for my channel members."+
-						" https://github.com/26000/irchuu"+
+						" https://github.com/nathan0/irchuu"+
 						" for more info.")
 			}
 		}*/

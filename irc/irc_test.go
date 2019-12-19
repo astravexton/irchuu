@@ -1,11 +1,12 @@
 package irchuu
 
 import (
-	"github.com/nathan0/irchuu/config"
-	"github.com/nathan0/irchuu/relay"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/astravexton/irchuu/config"
+	"github.com/astravexton/irchuu/relay"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -82,24 +83,24 @@ var (
 	}
 
 	colorizeNickTestData = map[string][2]string{
-		"irchuu":    [2]string{"\x036irchuu\x03", "\x033irchuu\x03"},
-		"nathan0":     [2]string{"\x033nathan0\x03", "\x0315nathan0\x03"},
-		"nick":      [2]string{"\x032nick\x03", "\x037nick\x03"},
-		"irc":       [2]string{"\x037irc\x03", "\x036irc\x03"},
-		"github":    [2]string{"\x032github\x03", "\x032github\x03"},
-		"kotobank":  [2]string{"\x037kotobank\x03", "\x032kotobank\x03"},
-		"koto":      [2]string{"\x036koto\x03", "\x035koto\x03"},
-		"crypto":    [2]string{"\x031crypto\x03", "\x037crypto\x03"},
-		"Athena":    [2]string{"\x037Athena\x03", "\x035Athena\x03"},
-		"a_word":    [2]string{"\x034a_word\x03", "\x0315a_word\x03"},
-		"snowflake": [2]string{"\x037snowflake\x03", "\x0315snowflake\x03"},
+		"irchuu":    [2]string{"\x036irchuu\x0f", "\x033irchuu\x0f"},
+		"astravexton":     [2]string{"\x033astravexton\x0f", "\x0315astravexton\x0f"},
+		"nick":      [2]string{"\x032nick\x0f", "\x037nick\x0f"},
+		"irc":       [2]string{"\x037irc\x0f", "\x036irc\x0f"},
+		"github":    [2]string{"\x032github\x0f", "\x032github\x0f"},
+		"kotobank":  [2]string{"\x037kotobank\x0f", "\x032kotobank\x0f"},
+		"koto":      [2]string{"\x036koto\x0f", "\x035koto\x0f"},
+		"crypto":    [2]string{"\x031crypto\x0f", "\x037crypto\x0f"},
+		"Athena":    [2]string{"\x037Athena\x0f", "\x035Athena\x0f"},
+		"a_word":    [2]string{"\x034a_word\x0f", "\x0315a_word\x0f"},
+		"snowflake": [2]string{"\x037snowflake\x0f", "\x0315snowflake\x0f"},
 	}
 
 	// djb2 worked as designed as of 2016-11-02 21:55:29, so i've generated test
 	// data using the function itself... https://play.golang.org/p/g08Au2v2Vg
 	djb2TestData = map[string]int32{
 		"irchuu":    85175221,
-		"nathan0":     195442781,
+		"astravexton":   195442781,
 		"nick":      2090544394,
 		"irc":       193495203,
 		"github":    -3157944,
@@ -115,8 +116,10 @@ var (
 func TestColorizeNick(t *testing.T) {
 	assert := assert.New(t)
 	for nick, arr := range colorizeNickTestData {
-		assert.Equal(arr[0], colorizeNick(nick, ircConf1))
-		assert.Equal(arr[1], colorizeNick(nick, ircConf2))
+		ircConf = ircConf1
+		assert.Equal(arr[0], colorizeNick(nick))
+		ircConf = ircConf2
+		assert.Equal(arr[1], colorizeNick(nick))
 	}
 }
 

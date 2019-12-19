@@ -6,7 +6,7 @@ import (
 	"os/user"
 	"path"
 
-	"github.com/nathan0/irchuu/config"
+	"github.com/astravexton/irchuu/config"
 )
 
 // GetPaths gets config file and data directory paths.

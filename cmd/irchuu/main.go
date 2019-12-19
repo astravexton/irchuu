@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -10,18 +9,18 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/nathan0/irchuu/config"
-	"github.com/nathan0/irchuu/db"
-	"github.com/nathan0/irchuu/hq"
-	"github.com/nathan0/irchuu/irc"
-	"github.com/nathan0/irchuu/paths"
-	"github.com/nathan0/irchuu/relay"
-	"github.com/nathan0/irchuu/server"
-	"github.com/nathan0/irchuu/telegram"
+	"github.com/astravexton/irchuu/config"
+	irchuubase "github.com/astravexton/irchuu/db"
+	// "github.com/astravexton/irchuu/hq" // we don't need this
+	irchuu "github.com/astravexton/irchuu/irc"
+	"github.com/astravexton/irchuu/paths"
+	"github.com/astravexton/irchuu/relay"
+	mediaserver "github.com/astravexton/irchuu/server"
+	"github.com/astravexton/irchuu/telegram"
 )
 
 func main() {
-	fmt.Printf("IRChuu! v%v (https://github.com/nathan0/irchuu)\n", config.VERSION)
+	fmt.Printf("IRChuu! v%v (https://github.com/astravexton/irchuu)\n", config.VERSION)
 
 	configFile, dataDir := paths.GetPaths()
 
@@ -44,10 +43,8 @@ func main() {
 
 	r := relay.NewRelay()
 
-	var db *sql.DB
-
 	if irchuuConf.DBURI != "" {
-		db = irchuubase.Init(irchuuConf.DBURI)
+		irchuubase.Init(irchuuConf.DBURI)
 	}
 
 	tg.DataDir = dataDir
@@ -56,7 +53,7 @@ func main() {
 		go mediaserver.Serve(tg)
 	}
 
-	hq.Report(irchuuConf, tg, irc)
+	// hq.Report(irchuuConf, tg, irc)
 
 	sigCh := make(chan os.Signal, 2)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
@@ -64,8 +61,8 @@ func main() {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go irchuu.Launch(irc, &wg, r, db)
-	go telegram.Launch(tg, &wg, r, db)
+	go irchuu.Launch(irc, &wg, r)
+	go telegram.Launch(tg, &wg, r)
 	wg.Wait()
 }
 

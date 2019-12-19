@@ -1,12 +1,13 @@
 package mediaserver
 
 import (
-	"github.com/nathan0/irchuu/config"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/astravexton/irchuu/config"
 )
 
 // Serve creates a web server and serves media files.

@@ -1,5 +1,5 @@
-# [IRChuu](https://nathan0.github.io/irchuu/) [![](https://goreportcard.com/badge/github.com/nathan0/irchuu)](https://goreportcard.com/report/github.com/nathan0/irchuu)
-![IRChuu in WeeChat](https://nathan0.github.io/irchuu/images/shadow/Screenshot_20170319_092103.png)
+# [IRChuu](https://astravexton.github.io/irchuu/) [![](https://goreportcard.com/badge/github.com/astravexton/irchuu)](https://goreportcard.com/report/github.com/astravexton/irchuu)
+![IRChuu in WeeChat](https://astravexton.github.io/irchuu/images/shadow/Screenshot_20170319_092103.png)
 
 A Telegram<->IRC transport.
 
@@ -24,25 +24,25 @@ You need to install [golang](https://golang.org/doc/install), [git](https://git-
 
 After that, install IRChuu~:
 ```
-$ go get github.com/nathan0/irchuu/cmd/irchuu
+$ go get github.com/astravexton/irchuu/cmd/irchuu
 ```
 Upgrade with:
 ```
-$ go get -u github.com/nathan0/irchuu/cmd/irchuu
+$ go get -u github.com/astravexton/irchuu/cmd/irchuu
 ```
 
 #### go modules mode, go >= 1.11
 Install and/or upgrade:
 ```
-$ go get github.com/nathan0/irchuu/cmd/irchuu
+$ go get github.com/astravexton/irchuu/cmd/irchuu
 ```
 
 ### Configuration
 Run IRChuu~ for the first time and it will create a configuration file (you can also use `-data` and `-config` command-line arguments to specify a custom path):
 ```
 $ irchuu
-IRChuu! v0.6.0 (https://github.com/nathan0/irchuu)
-2017/04/01 15:26:03 New configuration file was populated. Edit /home/nathan0/.config/irchuu.conf and run `irchuu` again!
+IRChuu! v0.6.0 (https://github.com/astravexton/irchuu)
+2017/04/01 15:26:03 New configuration file was populated. Edit /home/astravexton/.config/irchuu.conf and run `irchuu` again!
 ```
 
 Now edit the configuration file with your favourite editor (mine is `vim`, but I thought `nano` is more popular. Alternatively, you can just use a GUI editor like Kate):
@@ -68,7 +68,7 @@ For IRChuu to work, you will need to create a Telegram bot as it works through t
 5. Optionally, type `/setuserpic` and upload a cute picure for your relay
 6. Add your bot to your Telegram group (*Add members* and type the bot username there)
 7. Launch IRChuu~ (just type `irchuu` in console once more)
-8. Your bot will leave a message with the group id and quit. That's totally ok, just copy the id into your config file, stop IRChuu (hit <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal where IRChuu~ is running)
+8. Your bot will leave a message with the group id. That's totally ok, just copy the id into your config file, stop IRChuu (hit <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal where IRChuu~ is running)
 9. All set, now just launch IRChuu for the third time and enjoy!
 
 ### IRC setup

@@ -13,22 +13,28 @@ import (
 	"unicode/utf8"
 
 	"code.cloudfoundry.org/bytefmt"
-	"github.com/nathan0/irchuu/config"
-	"github.com/nathan0/irchuu/db"
-	"github.com/nathan0/irchuu/relay"
-	"github.com/thoj/go-ircevent"
+	"github.com/astravexton/irchuu/config"
+	irchuubase "github.com/astravexton/irchuu/db"
+	"github.com/astravexton/irchuu/relay"
+	irc "github.com/thoj/go-ircevent"
+)
+
+var (
+	ircConn *irc.Connection
+	ircConf *config.Irc
 )
 
 // Launch starts the IRC bot and waits for messages.
-func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
+func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay) {
 	defer wg.Done()
 
 	startTime := time.Now()
+	ircConf = c
 
 	logger := log.New(os.Stdout, "IRC ", log.LstdFlags)
-	irchuu := irc.IRC(c.Nick, "IRChuu")
-	irchuu.UseTLS = c.SSL
-	irchuu.Password = c.ServerPassword
+	ircConn = irc.IRC(c.Nick, "IRChuu")
+	ircConn.UseTLS = c.SSL
+	ircConn.Password = c.ServerPassword
 
 	// 0 — not on channel
 	// 1 — normal
@@ -42,24 +48,24 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 	nameQueryStarted := false
 
 	if c.SASL {
-		irchuu.UseSASL = true
-		irchuu.SASLLogin = c.Nick
-		irchuu.SASLPassword = c.Password
+		ircConn.UseSASL = true
+		ircConn.SASLLogin = c.Nick
+		ircConn.SASLPassword = c.Password
 	}
 
-	irchuu.Debug = c.Debug
-	irchuu.Log = logger
-	irchuu.QuitMessage = "IRChuu!bye"
-	irchuu.Version = fmt.Sprintf("IRChuu! v%v (https://github.com/nathan0/irchuu), based on %v", config.VERSION, irc.VERSION)
+	ircConn.Debug = c.Debug
+	ircConn.Log = logger
+	ircConn.QuitMessage = "IRChuu!bye"
+	ircConn.Version = fmt.Sprintf("IRChuu! v%v (https://github.com/astravexton/irchuu), based on %v", config.VERSION, irc.VERSION)
 
 	/* START CALLBACKS */
-	irchuu.AddCallback("CTCP_VERSION", func(event *irc.Event) {
+	ircConn.AddCallback("CTCP_VERSION", func(event *irc.Event) {
 		logger.Printf("CTCP VERSION from %v\n", event.Nick)
 	})
 
-	irchuu.AddCallback("CTCP", func(event *irc.Event) {
+	ircConn.AddCallback("CTCP", func(event *irc.Event) {
 		if event.Arguments[1] == "UPTIME" {
-			irchuu.SendRawf("NOTICE %s :\x01UPTIME %s\x01", event.Nick,
+			ircConn.SendRawf("NOTICE %s :\x01UPTIME %s\x01", event.Nick,
 				time.Since(startTime))
 			logger.Printf("CTCP %v from %v\n", event.Arguments[1],
 				event.Nick)
@@ -69,19 +75,17 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 		}
 	})
 
-	irchuu.RemoveCallback("CTCP_CLIENTINFO", 0)
-	irchuu.AddCallback("CTCP_CLIENTINFO", func(event *irc.Event) {
-		irchuu.SendRawf("NOTICE %s :\x01CLIENTINFO PING VERSION TIME UPTIME USERINFO CLIENTINFO\x01",
+	ircConn.RemoveCallback("CTCP_CLIENTINFO", 0)
+	ircConn.AddCallback("CTCP_CLIENTINFO", func(event *irc.Event) {
+		ircConn.SendRawf("NOTICE %s :\x01CLIENTINFO PING VERSION TIME UPTIME USERINFO CLIENTINFO\x01",
 			event.Nick)
 	})
 
-	irchuu.AddCallback("NOTICE", func(event *irc.Event) {
+	ircConn.AddCallback("NOTICE", func(event *irc.Event) {
 		if event.Arguments[0] == c.Channel {
 			f := formatMessage(event.Nick, event.Message(), "NOTICE")
 			r.IRCh <- f
-			if db != nil {
-				go irchuubase.Log(f, db, logger)
-			}
+			go irchuubase.Log(f, logger)
 		} else {
 			logger.Printf("Notice from %v: %v\n",
 				event.Nick, event.Message())
@@ -90,64 +94,64 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 	})
 
 	// SASL Authentication status
-	irchuu.AddCallback("903", func(event *irc.Event) {
+	ircConn.AddCallback("903", func(event *irc.Event) {
 		logger.Printf("%v\n", event.Arguments[1])
 	})
 
 	// Errors
-	irchuu.AddCallback("461", func(event *irc.Event) {
+	ircConn.AddCallback("461", func(event *irc.Event) {
 		logger.Printf("Error: ERR_NEEDMOREPARAMS\n")
 	})
 
-	irchuu.AddCallback("433", func(event *irc.Event) {
+	ircConn.AddCallback("433", func(event *irc.Event) {
 		logger.Printf("Nickname already in use, changed to %v\n",
-			irchuu.GetNick())
-		irchuu.Join(fmt.Sprintf("%v %v", c.Channel, c.ChanPassword))
+			ircConn.GetNick())
+		ircConn.Join(fmt.Sprintf("%v %v", c.Channel, c.ChanPassword))
 	})
 
-	irchuu.AddCallback("473", func(event *irc.Event) {
+	ircConn.AddCallback("473", func(event *irc.Event) {
 		logger.Printf("The channel is invite-only, please invite me\n")
 	})
 
-	irchuu.AddCallback("471", func(event *irc.Event) {
+	ircConn.AddCallback("471", func(event *irc.Event) {
 		logger.Printf("The channel is full\n")
 	})
 
-	irchuu.AddCallback("403", func(event *irc.Event) {
+	ircConn.AddCallback("403", func(event *irc.Event) {
 		logger.Printf("The channel doesn't exist\n")
 	})
 
-	irchuu.AddCallback("474", func(event *irc.Event) {
-		logger.Printf("%v is banned on the channel\n", irchuu.GetNick())
+	ircConn.AddCallback("474", func(event *irc.Event) {
+		logger.Printf("%v is banned on the channel\n", ircConn.GetNick())
 	})
 
-	irchuu.AddCallback("475", func(event *irc.Event) {
+	ircConn.AddCallback("475", func(event *irc.Event) {
 		logger.Printf("The channel password is incorrect\n")
 	})
 
-	irchuu.AddCallback("476", func(event *irc.Event) {
+	ircConn.AddCallback("476", func(event *irc.Event) {
 		logger.Printf("Error: ERR_BADCHANMASK\n")
 	})
 
-	irchuu.AddCallback("405", func(event *irc.Event) {
+	ircConn.AddCallback("405", func(event *irc.Event) {
 		logger.Printf("Error: ERR_TOOMANYCHANNELS\n")
 	})
 
 	// You are not channel operator
-	irchuu.AddCallback("482", func(event *irc.Event) {
+	ircConn.AddCallback("482", func(event *irc.Event) {
 		if event.Arguments[1] == c.Channel {
 			r.IRCServiceCh <- relay.ServiceMessage{"announce", []string{"I need to be an operator in IRC for that action."}}
 		}
 	})
 
-	irchuu.AddCallback("INVITE", func(event *irc.Event) {
+	ircConn.AddCallback("INVITE", func(event *irc.Event) {
 		logger.Printf("Invited to %v by %v\n", event.Arguments[1], event.Nick)
 		if c.Channel == event.Arguments[1] {
-			irchuu.Join(fmt.Sprintf("%v %v", c.Channel, c.ChanPassword))
+			ircConn.Join(fmt.Sprintf("%v %v", c.Channel, c.ChanPassword))
 		}
 	})
 
-	irchuu.AddCallback("341", func(event *irc.Event) {
+	ircConn.AddCallback("341", func(event *irc.Event) {
 		s := relay.ServiceMessage{"announce",
 			[]string{fmt.Sprintf("Invited %v to %v.", event.Arguments[1],
 				event.Arguments[2])}}
@@ -157,7 +161,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 	})
 
 	// TODO: add bold for these messages
-	irchuu.AddCallback("443", func(event *irc.Event) {
+	ircConn.AddCallback("443", func(event *irc.Event) {
 		s := relay.ServiceMessage{"announce",
 			[]string{fmt.Sprintf("User %v is already on channel.",
 				event.Arguments[1])}}
@@ -166,7 +170,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 	})
 
 	/*
-		irchuu.AddCallback("401", func(event *irc.Event) {
+		ircConn.AddCallback("401", func(event *irc.Event) {
 			s := relay.ServiceMessage{"announce",
 				[]string{fmt.Sprintf("No such nick: %v.", event.Arguments[1])}}
 
@@ -176,14 +180,14 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 	*/
 
 	// On joined...
-	irchuu.AddCallback("JOIN", func(event *irc.Event) {
-		if event.Nick == irchuu.GetNick() {
+	ircConn.AddCallback("JOIN", func(event *irc.Event) {
+		if event.Nick == ircConn.GetNick() {
 			logger.Printf("Joined %v\n", event.Arguments[0])
 			if event.Arguments[0] == c.Channel {
-				go relayMessagesToIRC(r, c, irchuu)
-				go listenService(r, c, irchuu, &names)
+				go relayMessagesToIRC(r)
+				go listenService(r, &names)
 				if !nameQueryStarted {
-					go updateNames(irchuu, c)
+					go updateNames()
 					nameQueryStarted = true
 				}
 			}
@@ -193,9 +197,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 				if c.RelayJoinsParts {
 					r.IRCh <- f
 				}
-				if db != nil {
-					go irchuubase.Log(f, db, logger)
-				}
+				go irchuubase.Log(f, logger)
 				names[event.Nick] = 1
 			}
 		}
@@ -203,7 +205,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 
 	if c.AnnounceTopic {
 		// Topic
-		irchuu.AddCallback("332", func(event *irc.Event) {
+		ircConn.AddCallback("332", func(event *irc.Event) {
 			if event.Arguments[1] == c.Channel {
 				r.IRCServiceCh <- relay.ServiceMessage{"announce",
 					[]string{fmt.Sprintf("The topic for %v is %v.",
@@ -212,7 +214,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 		})
 
 		// No topic
-		irchuu.AddCallback("331", func(event *irc.Event) {
+		ircConn.AddCallback("331", func(event *irc.Event) {
 			if event.Arguments[1] == c.Channel {
 				r.IRCServiceCh <- relay.ServiceMessage{"announce",
 					[]string{"No topic is set."}}
@@ -221,7 +223,7 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 	}
 
 	// Names
-	irchuu.AddCallback("353", func(event *irc.Event) {
+	ircConn.AddCallback("353", func(event *irc.Event) {
 		if event.Arguments[2] == c.Channel {
 			for _, name := range strings.Split(event.Arguments[3], " ") {
 				if len(name) == 0 {
@@ -246,80 +248,76 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 	})
 
 	// End of names
-	irchuu.AddCallback("366", func(event *irc.Event) {
+	ircConn.AddCallback("366", func(event *irc.Event) {
 		if event.Arguments[1] == c.Channel {
 			names = tempNames
 		}
 	})
 
-	irchuu.AddCallback("PRIVMSG", func(event *irc.Event) {
+	ircConn.AddCallback("PRIVMSG", func(event *irc.Event) {
 		if event.Arguments[0] == c.Channel {
+			if c.IgnoreMap[event.Nick] {
+				return
+			}
+
 			f := formatMessage(event.Nick, event.Message(), "")
 			r.IRCh <- f
-			if db != nil {
-				go irchuubase.Log(f, db, logger)
-			}
+			go irchuubase.Log(f, logger)
 			if strings.HasPrefix(event.Message(), c.Nick) {
-				processCmd(event, irchuu, c, r, db, &names)
+				processCmd(event, r, &names)
 			}
 		} /*else {
 			logger.Printf("Message from %v: %v\n",
 				event.Nick, event.Message())
 			if names[event.Nick] != 0 {
-				processPMCmd(event, irchuu, c, r, db)
+				processPMCmd(event, r)
 			} else {
-				noticeOrMsg(irchuu, c.SendNotices, event.Nick,
+				noticeOrMsg(c.SendNotices, event.Nick,
 					"I work only for my channel members."+
-						" https://github.com/nathan0/irchuu"+
+						" https://github.com/astravexton/irchuu"+
 						" for more info.")
 			}
 		}*/
 	})
 
-	irchuu.AddCallback("CTCP_ACTION", func(event *irc.Event) {
+	ircConn.AddCallback("CTCP_ACTION", func(event *irc.Event) {
 		if event.Arguments[0] == c.Channel {
 			f := formatMessage(event.Nick, event.Message(), "ACTION")
 			r.IRCh <- f
-			if db != nil {
-				go irchuubase.Log(f, db, logger)
-			}
+			go irchuubase.Log(f, logger)
 		} else {
 			logger.Printf("CTCP ACTION from %v: %v\n",
 				event.Nick, event.Message())
 		}
 	})
 
-	irchuu.AddCallback("KICK", func(event *irc.Event) {
+	ircConn.AddCallback("KICK", func(event *irc.Event) {
 		if event.Arguments[0] == c.Channel {
 			f := formatMessage(event.Nick, event.Arguments[1], "KICK")
 			r.IRCh <- f // TODO: kick reasons are not saved
-			if db != nil {
-				go irchuubase.Log(f, db, logger)
-			}
+			go irchuubase.Log(f, logger)
 			names[event.Arguments[1]] = 0
-			if event.Arguments[1] == irchuu.GetNick() {
+			if event.Arguments[1] == ircConn.GetNick() {
 				stopMsg := relay.Message{Extra: map[string]string{"break": "true"}}
 				stopCmd := relay.ServiceMessage{Command: "break"}
 				r.TeleCh <- stopMsg
 				r.TeleServiceCh <- stopCmd
 				if c.KickRejoin {
-					irchuu.Join(fmt.Sprintf("%v %v", c.Channel, c.ChanPassword))
+					ircConn.Join(fmt.Sprintf("%v %v", c.Channel, c.ChanPassword))
 				}
 			}
 		}
 	})
 
-	irchuu.AddCallback("NICK", func(event *irc.Event) {
+	ircConn.AddCallback("NICK", func(event *irc.Event) {
 		f := formatMessage(event.Nick, event.Arguments[0], "NICK")
 		r.IRCh <- f
-		if db != nil {
-			go irchuubase.Log(f, db, logger)
-		}
+		go irchuubase.Log(f, logger)
 		names[event.Arguments[0]] = names[event.Nick]
 		names[event.Nick] = 0
 	})
 
-	irchuu.AddCallback("PART", func(event *irc.Event) {
+	ircConn.AddCallback("PART", func(event *irc.Event) {
 		if event.Arguments[0] == c.Channel {
 			var reason string
 			if len(event.Arguments) > 1 {
@@ -329,14 +327,12 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 			if c.RelayJoinsParts {
 				r.IRCh <- f
 			}
-			if db != nil {
-				go irchuubase.Log(f, db, logger)
-			}
+			go irchuubase.Log(f, logger)
 			names[event.Nick] = 0
 		}
 	})
 
-	irchuu.AddCallback("QUIT", func(event *irc.Event) {
+	ircConn.AddCallback("QUIT", func(event *irc.Event) {
 		var reason string
 		if len(event.Arguments) > 0 {
 			reason = event.Arguments[0]
@@ -345,21 +341,17 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 		if c.RelayJoinsParts {
 			r.IRCh <- f
 		}
-		if db != nil {
-			go irchuubase.Log(f, db, logger)
-		}
+		go irchuubase.Log(f, logger)
 		names[event.Nick] = 0
 	})
 
-	irchuu.AddCallback("MODE", func(event *irc.Event) {
+	ircConn.AddCallback("MODE", func(event *irc.Event) {
 		if event.Arguments[0] == c.Channel {
 			f := formatMessage(event.Nick, strings.Join(event.Arguments, " "), "MODE")
 			if c.RelayModes {
 				r.IRCh <- f
 			}
-			if db != nil {
-				go irchuubase.Log(f, db, logger)
-			}
+			go irchuubase.Log(f, logger)
 			if len(event.Arguments) > 2 {
 				for k, o := range parseMode(event) {
 					names[k] = o
@@ -368,50 +360,48 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay, db *sql.DB) {
 		}
 	})
 
-	irchuu.AddCallback("TOPIC", func(event *irc.Event) {
+	ircConn.AddCallback("TOPIC", func(event *irc.Event) {
 		if event.Arguments[0] == c.Channel {
 			f := formatMessage(event.Nick, event.Arguments[1], "TOPIC")
 			r.IRCh <- f
-			if db != nil {
-				go irchuubase.Log(f, db, logger)
-			}
+			go irchuubase.Log(f, logger)
 		}
 	})
 
 	// On connected...
-	irchuu.AddCallback("001", func(event *irc.Event) {
+	ircConn.AddCallback("001", func(event *irc.Event) {
 		if !c.SASL && c.Password != "" {
 			logger.Println("Trying to authenticate via NickServ")
-			irchuu.Privmsgf("NickServ", "IDENTIFY %v", c.Password)
+			ircConn.Privmsgf("NickServ", "IDENTIFY %v", c.Password)
 		}
 
-		irchuu.Join(fmt.Sprintf("%v %v", c.Channel, c.ChanPassword))
+		ircConn.Join(fmt.Sprintf("%v %v", c.Channel, c.ChanPassword))
 	})
 	/* CALLBACKS END */
 
-	err := irchuu.Connect(fmt.Sprintf("%v:%d", c.Server, c.Port))
+	err := ircConn.Connect(fmt.Sprintf("%v:%d", c.Server, c.Port))
 	if err != nil {
 		logger.Fatalf("Cannot connect: %v\n", err)
 	}
 
-	irchuu.Loop()
+	ircConn.Loop()
 }
 
 // noticeOrMsg sends NOTICE if the second arg is true or PRIVMSG else.
-func noticeOrMsg(irc *irc.Connection, notice bool, target, message string) {
+func noticeOrMsg(notice bool, target, message string) {
 	if notice {
-		irc.Notice(target, message)
+		ircConn.Notice(target, message)
 	} else {
-		irc.Privmsg(target, message)
+		ircConn.Privmsg(target, message)
 	}
 }
 
 // noticeOrMsgf sends formatted NOTICE or PRIVMSG.
-func noticeOrMsgf(irc *irc.Connection, notice bool, target, format string, a ...interface{}) {
+func noticeOrMsgf(notice bool, target, format string, a ...interface{}) {
 	if notice {
-		irc.Noticef(target, format, a...)
+		ircConn.Noticef(target, format, a...)
 	} else {
-		irc.Privmsgf(target, format, a...)
+		ircConn.Privmsgf(target, format, a...)
 	}
 }
 
@@ -485,37 +475,37 @@ func parseMode(event *irc.Event) map[string]int {
 }
 
 // updateNames tries to update the name list occasionally.
-func updateNames(irchuu *irc.Connection, c *config.Irc) {
+func updateNames() {
 	for {
-		time.Sleep(time.Second * time.Duration(c.NamesUpdateInterval))
-		irchuu.SendRawf("NAMES %v", c.Channel)
+		time.Sleep(time.Second * time.Duration(ircConf.NamesUpdateInterval))
+		ircConn.SendRawf("NAMES %v", ircConf.Channel)
 	}
 }
 
 // relayMessagesToIRC listens to the Telegram channel and sends every message
 // into IRC.
-func relayMessagesToIRC(r *relay.Relay, c *config.Irc, irchuu *irc.Connection) {
+func relayMessagesToIRC(r *relay.Relay) {
 	for message := range r.TeleCh {
 		if message.Extra["break"] == "true" {
 			break
 		}
 		var messages []string
 		if message.Extra["special"] == "" {
-			messages = formatIRCMessages(message, c, 0)
+			messages = formatIRCMessages(message, 0)
 		} else {
-			messages = formatSpecialIRCMessages(message, c)
+			messages = formatSpecialIRCMessages(message)
 		}
 		for _, m := range messages {
-			irchuu.Privmsg(c.Channel, m)
-			if c.FloodDelay != 0 {
-				time.Sleep(time.Duration(c.FloodDelay) * time.Millisecond)
+			ircConn.Privmsg(ircConf.Channel, m)
+			if ircConf.FloodDelay != 0 {
+				time.Sleep(time.Duration(ircConf.FloodDelay) * time.Millisecond)
 			}
 		}
 	}
 }
 
 // listenService listens to service messages and executes them.
-func listenService(r *relay.Relay, c *config.Irc, irchuu *irc.Connection, names *map[string]int) {
+func listenService(r *relay.Relay, names *map[string]int) {
 	for f := range r.TeleServiceCh {
 		switch f.Command {
 		case "break":
@@ -524,13 +514,13 @@ func listenService(r *relay.Relay, c *config.Irc, irchuu *irc.Connection, names 
 			fallthrough
 		case "bot":
 			if len(f.Arguments) != 0 {
-				irchuu.Privmsg(c.Channel, f.Arguments[0])
+				ircConn.Privmsg(ircConf.Channel, f.Arguments[0])
 			}
 		case "action":
-			irchuu.Action(c.Channel, f.Arguments[0])
+			ircConn.Action(ircConf.Channel, f.Arguments[0])
 		case "kick":
-			if len(f.Arguments) == 2 && f.Arguments[0] != irchuu.GetNick() {
-				irchuu.Kick(f.Arguments[0], c.Channel,
+			if len(f.Arguments) == 2 && f.Arguments[0] != ircConn.GetNick() {
+				ircConn.Kick(f.Arguments[0], ircConf.Channel,
 					"by "+f.Arguments[1])
 			}
 		case "ops":
@@ -543,54 +533,58 @@ func listenService(r *relay.Relay, c *config.Irc, irchuu *irc.Connection, names 
 			r.IRCServiceCh <- relay.ServiceMessage{"announce", []string{ops}}
 		case "invite":
 			if len(f.Arguments) != 0 {
-				irchuu.SendRawf("INVITE %v %v", f.Arguments[0], c.Channel)
+				ircConn.SendRawf("INVITE %v %v", f.Arguments[0], ircConf.Channel)
 			}
 		case "topic":
-			irchuu.SendRawf("TOPIC %v", c.Channel)
+			ircConn.SendRawf("TOPIC %v", ircConf.Channel)
 		case "shutdown":
-			irchuu.Quit()
+			if irchuubase.IsAvailable() {
+				irchuubase.Close()
+			}
+
+			ircConn.Quit()
 			time.Sleep(time.Second)
 			os.Exit(0)
 		}
 
-		if c.FloodDelay != 0 {
-			time.Sleep(time.Duration(c.FloodDelay) * time.Millisecond)
+		if ircConf.FloodDelay != 0 {
+			time.Sleep(time.Duration(ircConf.FloodDelay) * time.Millisecond)
 		}
 	}
 }
 
 // formatIRCMessage translates universal messages into IRC.
-func formatIRCMessages(message relay.Message, c *config.Irc, prefixLen int) []string {
+func formatIRCMessages(message relay.Message, prefixLen int) []string {
 	var nick string
 
 	if !message.Source {
-		nick = colorizeNick(message.Nick, c)
+		nick = colorizeNick(message.Nick)
 	} else {
-		nick = formatNick(message, c)
+		nick = formatNick(message)
 	}
 	// 512 - 2 for CRLF - 7 for "PRIVMSG" - 4 for spaces - 9 just in case - 50 just in case
-	acceptibleLength := 440 - len(nick) - len(c.Channel) - prefixLen
+	acceptibleLength := 440 - len(nick) - len(ircConf.Channel) - prefixLen
 
-	if c.Ellipsis != "" {
-		message.Text = strings.Replace(message.Text, "\n", c.Ellipsis, -1)
+	if ircConf.Ellipsis != "" {
+		message.Text = strings.Replace(message.Text, "\n", ircConf.Ellipsis, -1)
 	}
 
 	// if message.Extra["forward"] != "" {
 	// 	message.Text = fmt.Sprintf("[\x0310fwd\x0f from @%v] %v",
-	// 		colorizeNick(message.Extra["forward"], c), message.Text)
+	// 		colorizeNick(message.Extra["forward"]), message.Text)
 	// } else if message.Extra["forwardChat"] != "" {
 	// 	message.Text = fmt.Sprintf("[\x0310fwd\x0f from channel @%v] %v",
-	// 		colorizeNick(message.Extra["forwardChat"], c), message.Text)
+	// 		colorizeNick(message.Extra["forwardChat"]), message.Text)
 	// } else if message.Extra["forwardChatTitle"] != "" {
 	// 	message.Text = fmt.Sprintf("[\x0310fwd\x0f from channel %v] %v",
-	// 		colorizeNick(message.Extra["forwardChatTitle"], c), message.Text)
+	// 		colorizeNick(message.Extra["forwardChatTitle"]), message.Text)
 	/*} else*/
 	if message.Extra["reply"] != "" && message.Extra["replyUserID"] != "" {
 		message.Text = fmt.Sprintf("@%v, %v",
-			colorizeNick(message.Extra["reply"], c), message.Text)
+			colorizeNick(message.Extra["reply"]), message.Text)
 	} else if message.Extra["reply"] != "" {
 		message.Text = fmt.Sprintf("%v, %v",
-			colorizeNick(message.Extra["reply"], c), message.Text)
+			colorizeNick(message.Extra["reply"]), message.Text)
 	}
 
 	if message.Extra["edit"] != "" {
@@ -598,7 +592,7 @@ func formatIRCMessages(message relay.Message, c *config.Irc, prefixLen int) []st
 	}
 
 	if message.Extra["media"] != "" {
-		message.Text = formatMediaMessage(message, c)
+		message.Text = formatMediaMessage(message)
 	}
 
 	messages := splitLines(message.Text, acceptibleLength, "")
@@ -609,7 +603,7 @@ func formatIRCMessages(message relay.Message, c *config.Irc, prefixLen int) []st
 // TODO: implement as a method?
 // TODO: clean the code, reuse parts
 // TODO: colorize
-func formatMediaMessage(message relay.Message, c *config.Irc) string {
+func formatMediaMessage(message relay.Message) string {
 	text := message.Text
 	if text != "" {
 		text += " "
@@ -646,11 +640,11 @@ func formatMediaMessage(message relay.Message, c *config.Irc) string {
 
 // formatSpecialIRCMessage translates special universal messages (service
 // messages, e. g. pin, kick, etc) into IRC.
-func formatSpecialIRCMessages(message relay.Message, c *config.Irc) (messages []string) {
+func formatSpecialIRCMessages(message relay.Message) (messages []string) {
 	switch message.Extra["special"] {
 	case "pin":
 		if message.Extra["media"] != "" {
-			message.Text = formatMediaMessage(message, c)
+			message.Text = formatMediaMessage(message)
 		}
 
 		txt := []rune(message.Text)
@@ -662,55 +656,55 @@ func formatSpecialIRCMessages(message relay.Message, c *config.Irc) (messages []
 			s = len(txt) - 1
 		}
 		messages = []string{fmt.Sprintf("%v pinned %v's message"+
-			" \"%v...\".", colorizeNick(message.Extra["pin"], c),
-			colorizeNick(message.Name(), c), string(txt[:s]))}
+			" \"%v...\".", colorizeNick(message.Extra["pin"]),
+			colorizeNick(message.Name()), string(txt[:s]))}
 	case "newChatMember":
 		if strconv.Itoa(message.FromID) == message.Extra["memberID"] {
 			messages = []string{fmt.Sprintf("%v joined the group via invite link.",
-				colorizeNick(message.Extra["memberName"], c))}
+				colorizeNick(message.Extra["memberName"]))}
 		} else {
 			messages = []string{fmt.Sprintf("%v was added by %v.",
-				colorizeNick(message.Extra["memberName"], c),
-				colorizeNick(message.Name(), c))}
+				colorizeNick(message.Extra["memberName"]),
+				colorizeNick(message.Name()))}
 		}
 	case "leftChatMember":
 		if strconv.Itoa(message.FromID) == message.Extra["memberID"] {
 			messages = []string{fmt.Sprintf("%v left the group.",
-				colorizeNick(message.Extra["memberName"], c))}
+				colorizeNick(message.Extra["memberName"]))}
 		} else {
 			messages = []string{fmt.Sprintf("%v was removed by %v.",
-				colorizeNick(message.Extra["memberName"], c),
-				colorizeNick(message.Name(), c))}
+				colorizeNick(message.Extra["memberName"]),
+				colorizeNick(message.Name()))}
 		}
 	case "newChatTitle":
 		messages = []string{fmt.Sprintf("Chat renamed to \"%v\" by %v.",
-			message.Extra["title"], colorizeNick(message.Name(), c))}
+			message.Extra["title"], colorizeNick(message.Name()))}
 	case "newChatPhoto":
 		messages = []string{fmt.Sprintf("The chat photo has been changed by %v.",
-			colorizeNick(message.Name(), c))}
+			colorizeNick(message.Name()))}
 	case "deleteChatPhoto":
 		messages = []string{fmt.Sprintf("The chat photo has been deleted by %v.",
-			colorizeNick(message.Name(), c))}
+			colorizeNick(message.Name()))}
 	case "KICK":
 		messages = []string{fmt.Sprintf("%v was kicked by %v.",
-			colorizeNick(message.Text, c),
-			colorizeNick(message.Nick, c))}
+			colorizeNick(message.Text),
+			colorizeNick(message.Nick))}
 	case "NICK":
 		messages = []string{fmt.Sprintf("%v is now known as %v.",
-			colorizeNick(message.Text, c),
-			colorizeNick(message.Nick, c))}
+			colorizeNick(message.Text),
+			colorizeNick(message.Nick))}
 	case "TOPIC":
 		messages = []string{fmt.Sprintf("%v set the topic to \"%v\".",
-			colorizeNick(message.Nick, c), message.Text)}
+			colorizeNick(message.Nick), message.Text)}
 	case "ACTION":
 		messages = []string{fmt.Sprintf("*%v %v*",
-			colorizeNick(message.Nick, c), message.Text)}
+			colorizeNick(message.Nick), message.Text)}
 	}
 	return
 }
 
 // processCmd executes commands.
-func processCmd(event *irc.Event, irchuu *irc.Connection, c *config.Irc, r *relay.Relay, db *sql.DB, names *map[string]int) {
+func processCmd(event *irc.Event, r *relay.Relay, names *map[string]int) {
 	cmd := strings.SplitN(event.Message(), " ", 3)
 	if len(cmd) < 2 {
 		return
@@ -719,65 +713,65 @@ func processCmd(event *irc.Event, irchuu *irc.Connection, c *config.Irc, r *rela
 	case "help":
 		texts := make([]string, 10)
 		texts[0] = "Available commands:"
-		texts[1] = c.Nick + " \x02help\x0f — show this help"
-		texts[2] = c.Nick + " \x02ops\x0f — show Telegram group ops"
-		texts[3] = c.Nick + " \x02count\x0f — show Telegram group user count"
-		texts[8] = "\x02/ctcp " + irchuu.GetNick() +
+		texts[1] = ircConf.Nick + " \x02help\x0f — show this help"
+		texts[2] = ircConf.Nick + " \x02ops\x0f — show Telegram group ops"
+		texts[3] = ircConf.Nick + " \x02count\x0f — show Telegram group user count"
+		texts[8] = "\x02/ctcp " + ircConn.GetNick() +
 			" version\x0f — get version"
 		texts[9] = "Some of these commands are available in PM."
-		if c.AllowStickers {
-			texts[7] = c.Nick + " \x02sticker [id]\x0f — send a sticker"
+		if ircConf.AllowStickers {
+			texts[7] = ircConf.Nick + " \x02sticker [id]\x0f — send a sticker"
 		}
-		if db != nil {
-			texts[4] = c.Nick +
+		if irchuubase.IsAvailable() {
+			texts[4] = ircConf.Nick +
 				" \x02hist [n]\x0f — get [n] last messages in PM"
-			if c.Moderation {
-				texts[5] = c.Nick +
+			if ircConf.Moderation {
+				texts[5] = ircConf.Nick +
 					" \x02kick [nick || full name]\x0f —" +
 					" kick a user from the Telegram group"
-				texts[6] = c.Nick +
+				texts[6] = ircConf.Nick +
 					" \x02unban [nick || full name]\x0f — unban a user"
 			}
 		}
 		for _, text := range texts {
 			if text != "" {
-				irchuu.Privmsg(c.Channel, text)
-				if c.FloodDelay != 0 {
-					time.Sleep(time.Duration(c.FloodDelay) * time.Millisecond)
+				ircConn.Privmsg(ircConf.Channel, text)
+				if ircConf.FloodDelay != 0 {
+					time.Sleep(time.Duration(ircConf.FloodDelay) * time.Millisecond)
 				}
 			}
 		}
 	case "hist":
-		if db != nil {
+		if irchuubase.IsAvailable() {
 			var n int
 			if len(cmd) > 2 && cmd[2] != "" {
 				n, _ = strconv.Atoi(cmd[2])
 			}
-			go sendHistory(db, event.Nick, irchuu, c, n)
+			go sendHistory(event.Nick, n)
 		}
 	case "kick":
-		if c.Moderation && len(cmd) > 2 {
-			if (*names)[event.Nick] >= c.KickPermission {
-				modifyUser(db, irchuu, r, cmd[2], c.Channel, false)
+		if ircConf.Moderation && irchuubase.IsAvailable() && len(cmd) > 2 {
+			if (*names)[event.Nick] >= ircConf.KickPermission {
+				modifyUser(r, cmd[2], ircConf.Channel, false)
 			} else {
-				irchuu.Privmsg(c.Channel, "Insufficient permission.")
+				ircConn.Privmsg(ircConf.Channel, "Insufficient permission.")
 			}
 		}
 	case "ops":
 		r.IRCServiceCh <- relay.ServiceMessage{"ops", nil}
 	case "sticker":
-		if c.AllowStickers && len(cmd) > 2 {
+		if ircConf.AllowStickers && len(cmd) > 2 {
 			time.Sleep(time.Duration(50) * time.Millisecond)
 			r.IRCServiceCh <- relay.ServiceMessage{"sticker", []string{cmd[2]}}
 		}
 	case "count":
 		r.IRCServiceCh <- relay.ServiceMessage{"count", nil}
 	case "unban":
-		if c.Moderation && len(cmd) > 2 {
-			if (*names)[event.Nick] >= c.KickPermission {
-				modifyUser(db, irchuu, r, cmd[2], c.Channel, true)
+		if ircConf.Moderation && irchuubase.IsAvailable() && len(cmd) > 2 {
+			if (*names)[event.Nick] >= ircConf.KickPermission {
+				modifyUser(r, cmd[2], ircConf.Channel, true)
 			} else {
-				irchuu.Privmsg(c.Channel, "Insufficient permission.")
+				ircConn.Privmsg(ircConf.Channel, "Insufficient permission.")
 			}
 		}
 	}
@@ -785,13 +779,13 @@ func processCmd(event *irc.Event, irchuu *irc.Connection, c *config.Irc, r *rela
 
 // modifyUser kicks a Telegram user from the groupchat or unbans them. Mode true
 // unbans, mode false kicks.
-func modifyUser(db *sql.DB, irchuu *irc.Connection, r *relay.Relay, name, channel string, mode bool) {
-	id, foundName, err := irchuubase.FindUser(name, db)
+func modifyUser(r *relay.Relay, name, channel string, mode bool) {
+	id, foundName, err := irchuubase.FindUser(name)
 	if err == sql.ErrNoRows {
-		irchuu.Privmsg(channel, "No such user.")
+		ircConn.Privmsg(channel, "No such user.")
 		return
 	} else if err != nil {
-		irchuu.Privmsg(channel, "An error occurred.")
+		ircConn.Privmsg(channel, "An error occurred.")
 		return
 	}
 	if mode {
@@ -802,7 +796,7 @@ func modifyUser(db *sql.DB, irchuu *irc.Connection, r *relay.Relay, name, channe
 }
 
 // processPMCmd executes commands sent in private.
-func processPMCmd(event *irc.Event, irchuu *irc.Connection, c *config.Irc, r *relay.Relay, db *sql.DB) {
+func processPMCmd(event *irc.Event, r *relay.Relay) {
 	cmd := strings.Split(event.Message(), " ")
 	if len(cmd) < 1 {
 		return
@@ -812,43 +806,43 @@ func processPMCmd(event *irc.Event, irchuu *irc.Connection, c *config.Irc, r *re
 		texts := make([]string, 5)
 		texts[0] = "Available commands:"
 		texts[1] = "\x02help\x0f — show this help"
-		texts[3] = "\x02/ctcp " + irchuu.GetNick() +
+		texts[3] = "\x02/ctcp " + ircConn.GetNick() +
 			" version\x0f — get version info"
 		texts[4] = "More commands are available in the channel."
-		if db != nil {
+		if irchuubase.IsAvailable() {
 			texts[2] = "\x02hist [n]\x0f — get [n] last messages"
 		}
 		for _, text := range texts {
 			if text != "" {
-				noticeOrMsg(irchuu, c.SendNotices, event.Nick, text)
-				if c.FloodDelay != 0 {
-					time.Sleep(time.Duration(c.FloodDelay) * time.Millisecond)
+				noticeOrMsg(ircConf.SendNotices, event.Nick, text)
+				if ircConf.FloodDelay != 0 {
+					time.Sleep(time.Duration(ircConf.FloodDelay) * time.Millisecond)
 				}
 			}
 		}
 	case "hist":
-		if db != nil {
+		if irchuubase.IsAvailable() {
 			var n int
 			if len(cmd) > 1 && cmd[1] != "" {
 				n, _ = strconv.Atoi(cmd[1])
 			}
-			go sendHistory(db, event.Nick, irchuu, c, n)
+			go sendHistory(event.Nick, n)
 		}
 	default:
-		noticeOrMsg(irchuu, c.SendNotices, event.Nick, "No such command. Enter"+
+		noticeOrMsg(ircConf.SendNotices, event.Nick, "No such command. Enter"+
 			" \x02help\x0f for the list of commands.")
 	}
 }
 
 // sendHistory retrieves the message history from DB and sends it to <nick>.
-func sendHistory(db *sql.DB, nick string, irchuu *irc.Connection, c *config.Irc, n int) {
-	if n == 0 || n > c.MaxHist {
-		n = c.MaxHist
+func sendHistory(nick string, n int) {
+	if n == 0 || n > ircConf.MaxHist {
+		n = ircConf.MaxHist
 	}
 	var msgs []relay.Message
-	msgs, err := irchuubase.GetMessages(db, n)
+	msgs, err := irchuubase.GetMessages(n)
 	if err != nil {
-		irchuu.Privmsgf(c.Channel, "%v: an error occurred during your request.",
+		ircConn.Privmsgf(ircConf.Channel, "%v: an error occurred during your request.",
 			nick)
 		return
 	}
@@ -858,14 +852,14 @@ func sendHistory(db *sql.DB, nick string, irchuu *irc.Connection, c *config.Irc,
 		date := "[\x0310" + msg.Date.Format("15:04:05") + "\x0f] "
 		var rawMsgs []string
 		if msg.Extra["special"] == "" {
-			rawMsgs = formatIRCMessages(msg, c, 14)
+			rawMsgs = formatIRCMessages(msg, 14)
 		} else {
-			rawMsgs = formatSpecialIRCMessages(msg, c)
+			rawMsgs = formatSpecialIRCMessages(msg)
 		}
 		for rawMsg := range rawMsgs {
-			noticeOrMsg(irchuu, c.SendNotices, nick, date+rawMsgs[rawMsg])
-			if c.FloodDelay != 0 {
-				time.Sleep(time.Duration(c.FloodDelay) * time.Millisecond)
+			noticeOrMsg(ircConf.SendNotices, nick, date+rawMsgs[rawMsg])
+			if ircConf.FloodDelay != 0 {
+				time.Sleep(time.Duration(ircConf.FloodDelay) * time.Millisecond)
 			}
 		}
 	}
@@ -898,17 +892,17 @@ func splitLines(text string, max int, prefix string) []string {
 }
 
 // formatNick processes nicknames.
-func formatNick(message relay.Message, c *config.Irc) string {
+func formatNick(message relay.Message) string {
 	nick := message.Name()
 	unicodeNick := []rune(nick)
 
-	if c.MaxLength != 0 && len(unicodeNick) > c.MaxLength {
-		unicodeNick = append(unicodeNick[:c.MaxLength-1], rune('…'))
+	if ircConf.MaxLength != 0 && len(unicodeNick) > ircConf.MaxLength {
+		unicodeNick = append(unicodeNick[:ircConf.MaxLength-1], rune('…'))
 		nick = string(unicodeNick)
 	}
 
-	if c.Colorize {
-		nick = colorizeNick(nick, c)
+	if ircConf.Colorize {
+		nick = colorizeNick(nick)
 	}
 
 	nick = "@" + nick
@@ -939,13 +933,13 @@ func djb2(nick string) int32 {
 }
 
 // colorizeNick adds color codes to the nickname.
-func colorizeNick(s string, c *config.Irc) string {
-	if !c.Colorize {
+func colorizeNick(s string) string {
+	if !ircConf.Colorize {
 		return s
 	}
-	i := djb2(s) % int32(len(c.Palette))
+	i := djb2(s) % int32(len(ircConf.Palette))
 	if i < 0 {
-		i += int32(len(c.Palette))
+		i += int32(len(ircConf.Palette))
 	}
-	return "\x03" + c.Palette[i] + s + "\x0f"
+	return "\x03" + ircConf.Palette[i] + s + "\x0f"
 }

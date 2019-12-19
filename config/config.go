@@ -10,10 +10,10 @@ import (
 
 const (
 	// VERSION contains the IRChuu~ version.
-	VERSION = "0.9.1"
+	VERSION = "1.0.0"
 	// LAYER contains IRChuu~ version in an integer (for comparison with
 	// HQ server's last version).
-	LAYER = 14
+	LAYER = 17
 )
 
 // ReadConfig reads the configuration file.
@@ -32,13 +32,15 @@ func ReadConfig(path string) (error, *Irc, *Telegram, *Irchuu) {
 
 	tg.Prefix = html.EscapeString(tg.Prefix)
 	tg.Postfix = html.EscapeString(tg.Postfix)
-	if tg.KomfPublicURL == "" {
-		tg.KomfPublicURL = tg.Komf
-	}
 
 	err = cfg.Section("irchuu").MapTo(irchuu)
 	if err != nil {
 		return err, irc, tg, irchuu
+	}
+
+	irc.IgnoreMap = map[string]bool{}
+	for _, nickname := range irc.IgnoreList {
+		irc.IgnoreMap[nickname] = true
 	}
 
 	return nil, irc, tg, irchuu
@@ -46,11 +48,16 @@ func ReadConfig(path string) (error, *Irc, *Telegram, *Irchuu) {
 
 // PopulateConfig copies the sample config to <path>.
 func PopulateConfig(file string) error {
-	config := `# IRChuu configuration file. See https://github.com/nathan0/irchuu for help.
+	config := `# IRChuu configuration file. See https://github.com/astravexton/irchuu for help.
 [irchuu]
 
 # URI of your PostgreSQL database
 # if blank, logging and kicking Telegram users from IRC will be unavailable
+# (you will have to specify ?sslmode=disable if your database doesn't have TLS)
+#
+# examples:
+# postgres://user:password@example.org:5432/database
+# postgres://irchuu:irchuu@localhost/irchuu?sslmode=disable
 dburi = 
 
 # send usage statistics
@@ -115,24 +122,16 @@ serverport = 8080
 baseurl = http://localhost:8080
 
 ## POMF
-# the pomf clone url (the list can be found at
-# https://docs.google.com/spreadsheets/d/1kh1TZdtyX7UlRd55OBxf7DB-JGj2rsfWckI0FPQRYhE)
+# the pomf clone url
 # the following should work with irchuu:
-# - https://mixtape.moe
-# - https://fluntcaps.me ( ;) )
 # - https://p.fuwafuwa.moe
 # - https://cocaine.ninja
 # and many more. But some are retarded and won't.
-pomf = https://mixtape.moe
+pomf = https://p.fuwafuwa.moe
 
 ## KOMF
 # a komf site url, you can set up your own: https://github.com/koto-bank/komf
 komf =
-
-# public url for your komf hosting, leave blank if it's same with above
-# (needed if the domain used for static is different or if you're uploading files
-# to a host in your local network)
-komfpublicurl =
 
 # how much time will the file be stored for? (day, week, month)
 komfdate = week
@@ -189,7 +188,7 @@ allowstickers = true
 # how often to poll the server for the users list
 namesupdateinterval = 600 # (seconds)
 
-# maximum number of messages sent on 'hist'command in IRC, works only with dburi set
+# maximum number of messages sent on 'hist' command in IRC, works only with dburi set
 maxhist = 40
 
 # will send NOTICEs for private messages (help, hist, user count, etc) instead of PRIVMSGs
@@ -206,6 +205,9 @@ kickrejoin = true
 
 # announce the current topic to Telegram on join
 announcetopic = true
+
+# list of nicknames to ignore, i. e. messages by these users won't be relayed
+ignorelist = ignoredbotnickname1,ignoredbotnickname2
 `
 	return ioutil.WriteFile(file, []byte(config), os.FileMode(0600))
 }
@@ -250,6 +252,9 @@ type Irc struct {
 	KickRejoin          bool
 	AnnounceTopic       bool
 
+	IgnoreList []string
+	IgnoreMap  map[string]bool
+
 	Debug bool
 }
 
@@ -278,7 +283,6 @@ type Telegram struct {
 	DataDir       string
 	Pomf          string
 	Komf          string
-	KomfPublicURL string
 	KomfDate      string
 }
 

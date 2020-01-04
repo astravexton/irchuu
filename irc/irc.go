@@ -151,23 +151,23 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay) {
 		}
 	})
 
-	ircConn.AddCallback("341", func(event *irc.Event) {
-		s := relay.ServiceMessage{"announce",
-			[]string{fmt.Sprintf("Invited %v to %v.", event.Arguments[1],
-				event.Arguments[2])}}
+	// ircConn.AddCallback("341", func(event *irc.Event) {
+	// 	s := relay.ServiceMessage{"announce",
+	// 		[]string{fmt.Sprintf("Invited %v to %v.", event.Arguments[1],
+	// 			event.Arguments[2])}}
 
-		r.IRCServiceCh <- s
-		r.TeleServiceCh <- s
-	})
+	// 	r.IRCServiceCh <- s
+	// 	r.TeleServiceCh <- s
+	// })
 
 	// TODO: add bold for these messages
-	ircConn.AddCallback("443", func(event *irc.Event) {
-		s := relay.ServiceMessage{"announce",
-			[]string{fmt.Sprintf("User %v is already on channel.",
-				event.Arguments[1])}}
+	// ircConn.AddCallback("443", func(event *irc.Event) {
+	// 	s := relay.ServiceMessage{"announce",
+	// 		[]string{fmt.Sprintf("User %v is already on channel.",
+	// 			event.Arguments[1])}}
 
-		r.IRCServiceCh <- s
-	})
+	// 	r.IRCServiceCh <- s
+	// })
 
 	/*
 		ircConn.AddCallback("401", func(event *irc.Event) {
@@ -263,9 +263,9 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay) {
 			f := formatMessage(event.Nick, event.Message(), "")
 			r.IRCh <- f
 			go irchuubase.Log(f, logger)
-			if strings.HasPrefix(event.Message(), c.Nick) {
-				processCmd(event, r, &names)
-			}
+			// if strings.HasPrefix(event.Message(), c.Nick) {
+			// 	processCmd(event, r, &names)
+			// }
 		} /*else {
 			logger.Printf("Message from %v: %v\n",
 				event.Nick, event.Message())

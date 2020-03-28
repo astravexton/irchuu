@@ -140,7 +140,9 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay) {
 	// You are not channel operator
 	ircConn.AddCallback("482", func(event *irc.Event) {
 		if event.Arguments[1] == c.Channel {
-			r.IRCServiceCh <- relay.ServiceMessage{"announce", []string{"I need to be an operator in IRC for that action."}}
+			r.IRCServiceCh <- relay.ServiceMessage{
+				Command:   "announce",
+				Arguments: []string{"I need to be an operator in IRC for that action."}}
 		}
 	})
 
@@ -207,8 +209,9 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay) {
 		// Topic
 		ircConn.AddCallback("332", func(event *irc.Event) {
 			if event.Arguments[1] == c.Channel {
-				r.IRCServiceCh <- relay.ServiceMessage{"announce",
-					[]string{fmt.Sprintf("The topic for %v is %v.",
+				r.IRCServiceCh <- relay.ServiceMessage{
+					Command: "announce",
+					Arguments: []string{fmt.Sprintf("The topic for %v is %v.",
 						c.Channel, event.Arguments[2])}}
 			}
 		})
@@ -216,8 +219,9 @@ func Launch(c *config.Irc, wg *sync.WaitGroup, r *relay.Relay) {
 		// No topic
 		ircConn.AddCallback("331", func(event *irc.Event) {
 			if event.Arguments[1] == c.Channel {
-				r.IRCServiceCh <- relay.ServiceMessage{"announce",
-					[]string{"No topic is set."}}
+				r.IRCServiceCh <- relay.ServiceMessage{
+					Command:   "announce",
+					Arguments: []string{"No topic is set."}}
 			}
 		})
 	}
@@ -530,7 +534,9 @@ func listenService(r *relay.Relay, names *map[string]int) {
 					ops += name + " "
 				}
 			}
-			r.IRCServiceCh <- relay.ServiceMessage{"announce", []string{ops}}
+			r.IRCServiceCh <- relay.ServiceMessage{
+				Command:   "announce",
+				Arguments: []string{ops}}
 		case "invite":
 			if len(f.Arguments) != 0 {
 				ircConn.SendRawf("INVITE %v %v", f.Arguments[0], ircConf.Channel)
@@ -758,14 +764,14 @@ func processCmd(event *irc.Event, r *relay.Relay, names *map[string]int) {
 			}
 		}
 	case "ops":
-		r.IRCServiceCh <- relay.ServiceMessage{"ops", nil}
+		r.IRCServiceCh <- relay.ServiceMessage{Command: "ops", Arguments: nil}
 	case "sticker":
 		if ircConf.AllowStickers && len(cmd) > 2 {
 			time.Sleep(time.Duration(50) * time.Millisecond)
-			r.IRCServiceCh <- relay.ServiceMessage{"sticker", []string{cmd[2]}}
+			r.IRCServiceCh <- relay.ServiceMessage{Command: "sticker", Arguments: []string{cmd[2]}}
 		}
 	case "count":
-		r.IRCServiceCh <- relay.ServiceMessage{"count", nil}
+		r.IRCServiceCh <- relay.ServiceMessage{Command: "count", Arguments: nil}
 	case "unban":
 		if ircConf.Moderation && irchuubase.IsAvailable() && len(cmd) > 2 {
 			if (*names)[event.Nick] >= ircConf.KickPermission {
@@ -789,9 +795,9 @@ func modifyUser(r *relay.Relay, name, channel string, mode bool) {
 		return
 	}
 	if mode {
-		r.IRCServiceCh <- relay.ServiceMessage{"unban", []string{strconv.Itoa(id), foundName}}
+		r.IRCServiceCh <- relay.ServiceMessage{Command: "unban", Arguments: []string{strconv.Itoa(id), foundName}}
 	} else {
-		r.IRCServiceCh <- relay.ServiceMessage{"kick", []string{strconv.Itoa(id), foundName}}
+		r.IRCServiceCh <- relay.ServiceMessage{Command: "kick", Arguments: []string{strconv.Itoa(id), foundName}}
 	}
 }
 

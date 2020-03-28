@@ -11,6 +11,7 @@ import (
 
 	"github.com/astravexton/irchuu/config"
 	irchuubase "github.com/astravexton/irchuu/db"
+
 	// "github.com/astravexton/irchuu/hq" // we don't need this
 	irchuu "github.com/astravexton/irchuu/irc"
 	"github.com/astravexton/irchuu/paths"
@@ -69,5 +70,5 @@ func main() {
 func sigNotify(sigCh chan os.Signal, r *relay.Relay) {
 	sig := <-sigCh
 	log.Printf("Caught signal: %v, exiting...\n", sig)
-	r.TeleServiceCh <- relay.ServiceMessage{"shutdown", []string{}}
+	r.TeleServiceCh <- relay.ServiceMessage{Command: "shutdown", Arguments: []string{}}
 }

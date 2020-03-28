@@ -84,7 +84,6 @@ var (
 
 	colorizeNickTestData = map[string][2]string{
 		"irchuu":    [2]string{"\x036irchuu\x0f", "\x033irchuu\x0f"},
-		"astravexton":     [2]string{"\x033astravexton\x0f", "\x0315astravexton\x0f"},
 		"nick":      [2]string{"\x032nick\x0f", "\x037nick\x0f"},
 		"irc":       [2]string{"\x037irc\x0f", "\x036irc\x0f"},
 		"github":    [2]string{"\x032github\x0f", "\x032github\x0f"},
@@ -100,7 +99,6 @@ var (
 	// data using the function itself... https://play.golang.org/p/g08Au2v2Vg
 	djb2TestData = map[string]int32{
 		"irchuu":    85175221,
-		"astravexton":   195442781,
 		"nick":      2090544394,
 		"irc":       193495203,
 		"github":    -3157944,

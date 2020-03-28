@@ -126,13 +126,13 @@ func listenService(r *relay.Relay, c *config.Telegram) {
 				tgbotapi.ChatConfig{ChatID: c.Group})
 			if err != nil {
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"announce",
-					[]string{"An error occured: \x02" + err.Error()},
+					Command:   "announce",
+					Arguments: []string{"An error occured: \x02" + err.Error()},
 				}
 			} else {
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"announce",
-					[]string{fmt.Sprintf("There are \x02%v"+
+					Command: "announce",
+					Arguments: []string{fmt.Sprintf("There are \x02%v"+
 						"\x0f users in the group.",
 						count)},
 				}
@@ -142,8 +142,8 @@ func listenService(r *relay.Relay, c *config.Telegram) {
 				tgbotapi.ChatConfig{ChatID: c.Group})
 			if err != nil {
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"announce",
-					[]string{"An error occured: \x02" +
+					Command: "announce",
+					Arguments: []string{"An error occured: \x02" +
 						err.Error()},
 				}
 			} else {
@@ -152,8 +152,8 @@ func listenService(r *relay.Relay, c *config.Telegram) {
 					opsStr += v.User.String() + " "
 				}
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"announce",
-					[]string{fmt.Sprintf(
+					Command: "announce",
+					Arguments: []string{fmt.Sprintf(
 						"Chat administrators: \x02%v"+
 							"\x0f",
 						opsStr)},
@@ -164,8 +164,8 @@ func listenService(r *relay.Relay, c *config.Telegram) {
 			_, err := bot.Send(sticker)
 			if err != nil {
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"announce",
-					[]string{"An error occured: \x02" +
+					Command: "announce",
+					Arguments: []string{"An error occured: \x02" +
 						err.Error()},
 				}
 			} else {
@@ -188,8 +188,8 @@ func listenService(r *relay.Relay, c *config.Telegram) {
 					}
 				}
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"announce",
-					[]string{text},
+					Command:   "announce",
+					Arguments: []string{text},
 				}
 			}
 		case "kick":
@@ -198,17 +198,17 @@ func listenService(r *relay.Relay, c *config.Telegram) {
 				ChatID: c.Group,
 				UserID: id,
 			}
-			_, err := bot.KickChatMember(tgbotapi.KickChatMemberConfig{member, 0})
+			_, err := bot.KickChatMember(tgbotapi.KickChatMemberConfig{ChatMemberConfig: member, UntilDate: 0})
 			if err != nil {
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"announce",
-					[]string{"Unable to kick: " +
+					Command: "announce",
+					Arguments: []string{"Unable to kick: " +
 						err.Error() + "."},
 				}
 			} else {
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"action",
-					[]string{"kicked " + f.Arguments[1] + "."},
+					Command:   "action",
+					Arguments: []string{"kicked " + f.Arguments[1] + "."},
 				}
 			}
 		case "unban":
@@ -220,14 +220,14 @@ func listenService(r *relay.Relay, c *config.Telegram) {
 			_, err := bot.UnbanChatMember(member)
 			if err != nil {
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"announce",
-					[]string{"Unable to unban: " +
+					Command: "announce",
+					Arguments: []string{"Unable to unban: " +
 						err.Error() + "."},
 				}
 			} else {
 				r.TeleServiceCh <- relay.ServiceMessage{
-					"action",
-					[]string{"unbanned " + f.Arguments[1] + "."},
+					Command:   "action",
+					Arguments: []string{"unbanned " + f.Arguments[1] + "."},
 				}
 			}
 		}
@@ -249,9 +249,8 @@ func processCmd(c *config.Telegram, message *tgbotapi.Message, cmd string, r *re
 					fallthrough
 				case "creator":
 					if arg != "" {
-						f := relay.ServiceMessage{"kick",
-							[]string{arg,
-								message.From.String()}}
+						f := relay.ServiceMessage{Command: "kick",
+							Arguments: []string{arg, message.From.String()}}
 						r.TeleServiceCh <- f
 					}
 				case "member":
@@ -268,20 +267,20 @@ func processCmd(c *config.Telegram, message *tgbotapi.Message, cmd string, r *re
 			}
 		}
 	case "ops":
-		f := relay.ServiceMessage{"ops", []string{arg}}
+		f := relay.ServiceMessage{Command: "ops", Arguments: []string{arg}}
 		r.TeleServiceCh <- f
 	case "bot":
 		if c.AllowBots {
-			f := relay.ServiceMessage{"bot", []string{arg}}
+			f := relay.ServiceMessage{Command: "bot", Arguments: []string{arg}}
 			r.TeleServiceCh <- f
 		}
 	case "invite":
 		if c.AllowInvites {
-			f := relay.ServiceMessage{"invite", []string{arg}}
+			f := relay.ServiceMessage{Command: "invite", Arguments: []string{arg}}
 			r.TeleServiceCh <- f
 		}
 	case "topic":
-		f := relay.ServiceMessage{"topic", nil}
+		f := relay.ServiceMessage{Command: "topic", Arguments: nil}
 		r.TeleServiceCh <- f
 	case "version":
 		m := tgbotapi.NewMessage(c.Group, "IRChuu v"+config.VERSION)
@@ -557,17 +556,17 @@ func download(id string, c *config.Telegram) (url string, err error) {
 	if len(fileName) > 1 {
 		ext = "." + fileName[len(fileName)-1]
 	}
-	localUrl := path.Join(c.DataDir, id+ext)
-	if paths.Exists(localUrl) {
+	localURL := path.Join(c.DataDir, id+ext)
+	if paths.Exists(localURL) {
 		url = c.BaseURL + "/" + id + ext
 		return
 	}
 	downloadable, err := http.Get(file)
-	defer downloadable.Body.Close()
 	if err != nil {
 		return
 	}
-	res, err := os.Create(localUrl)
+	defer downloadable.Body.Close()
+	res, err := os.Create(localURL)
 	if err != nil {
 		return
 	}

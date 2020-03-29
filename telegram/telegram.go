@@ -79,6 +79,14 @@ func processChatMessage(c *config.Telegram, message *tgbotapi.Message, logger *l
 		f := formatMessage(message, bot.Self.ID, c.Prefix)
 		if f.Extra["mediaID"] != "" {
 			switch {
+			case c.Storage == "ihaveahuge.wang":
+				url, err := upload.Ihaveahugewang(bot, f.Extra["mediaID"], c)
+				if err != nil {
+					logger.Printf("Could not upload media %v: %v\n",
+						f.Extra["mediaID"], err)
+				} else {
+					f.Extra["url"] = url
+				}
 			case c.Storage == "pomf":
 				url, err := upload.Pomf(bot, f.Extra["mediaID"], c)
 				if err != nil {
@@ -527,6 +535,10 @@ func formatMessage(message *tgbotapi.Message, id int, prefix string) relay.Messa
 		extra["special"] = "newChatPhoto"
 	case message.DeleteChatPhoto != false:
 		extra["special"] = "deleteChatPhoto"
+	}
+
+	if message.From.ID == 63391517 {
+		message.Text = fmt.Sprintf("🦆 %s", message.Text)
 	}
 
 	return relay.Message{

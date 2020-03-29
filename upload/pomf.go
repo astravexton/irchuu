@@ -89,6 +89,9 @@ func uploadLocalFilePomf(file string, c *config.Telegram) (url string, err error
 // whole file to memory because of the current implementation of Go's multipart.
 func uploadRemoteFilePomf(file string, localUrl string, id string, name string, c *config.Telegram) (url string, err error) {
 	downloadable, err := http.Get(file)
+	if err != nil {
+		return
+	}
 	defer downloadable.Body.Close()
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)

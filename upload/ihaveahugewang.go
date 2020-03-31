@@ -41,7 +41,7 @@ func Ihaveahugewang(bot *tgbotapi.BotAPI, id string, c *config.Telegram) (url st
 // the current implementation of Go's multipart.
 func uploadLocalFileWang(file string, c *config.Telegram) (url string, err error) {
 	ct, bd := ihaveahugewangUploader.PrepareUploadBody(file)
-	data, err := ihaveahugewangUploader.UploadToSite(ct, bd)
+	data, err := ihaveahugewangUploader.UploadToSite(ct, bd, c.UploadURL)
 	url = fmt.Sprintf("https://ihaveahuge.wang/i/%s", data.Slug)
 	return
 }
@@ -68,7 +68,7 @@ func uploadRemoteFileWang(file string, localUrl string, id string, name string, 
 	}
 
 	ct, bd := ihaveahugewangUploader.PrepareUploadBody(localUrl)
-	data, err := ihaveahugewangUploader.UploadToSite(ct, bd)
+	data, err := ihaveahugewangUploader.UploadToSite(ct, bd, c.UploadURL)
 	url = fmt.Sprintf("https://ihaveahuge.wang/i/%s", data.Slug)
 
 	return

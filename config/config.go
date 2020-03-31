@@ -284,6 +284,7 @@ type Telegram struct {
 	Pomf          string
 	Komf          string
 	KomfDate      string
+	UploadURL     string
 }
 
 // muDeiPt5mAI8Ue==
